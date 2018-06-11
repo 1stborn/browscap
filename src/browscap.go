@@ -28,6 +28,12 @@ type Version struct {
 	Time    time.Time
 }
 
+type Browscap interface {
+	Service(fn func(Version))
+	Find(agent string) *Browser
+	Count() int
+}
+
 type browscap struct {
 	Version
 
