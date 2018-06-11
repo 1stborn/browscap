@@ -33,7 +33,7 @@ const (
 )
 
 type Browser struct {
-	*browscap
+	bs *Browscap
 
 	browser  uint32
 	platform uint32
@@ -138,18 +138,18 @@ func (b *Browser) mapArray(opts []string) {
 	b.setPointingMethod(fDevicePointingMethod.GetString(opts))
 
 	value, hash := fPlatform.Hash(opts)
-	if _, ok := b.platforms[hash]; !ok {
-		b.platforms[hash] = strings.ToLower(value)
+	if _, ok := b.bs.platforms[hash]; !ok {
+		b.bs.platforms[hash] = strings.ToLower(value)
 	}
 	b.platform = hash
 
 	value, hash = fBrowser.Hash(opts)
-	if _, ok := b.platforms[hash]; !ok {
-		b.browsers[hash] = strings.ToLower(value)
+	if _, ok := b.bs.platforms[hash]; !ok {
+		b.bs.browsers[hash] = strings.ToLower(value)
 	}
 	b.browser = hash
 }
 
 func (b Browser) String() string {
-	return fmt.Sprintf("{%s@%s %s with %s}", b.browsers[b.browser], b.platforms[b.platform], b.deviceType, b.pointingMethod)
+	return fmt.Sprintf("{%s@%s %s with %s}", b.bs.browsers[b.browser], b.bs.platforms[b.platform], b.deviceType, b.pointingMethod)
 }

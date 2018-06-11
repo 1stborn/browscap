@@ -18,8 +18,8 @@ const (
 	Full
 )
 
-const browscapVersion = "http://browscap.org/version"
-const browscapStream = "https://browscap.org/stream?q="
+const browscapVersion = "http://Browscap.org/version"
+const browscapStream = "https://Browscap.org/stream?q="
 
 const defaultStream = "BrowsCapCSV"
 
@@ -28,13 +28,7 @@ type Version struct {
 	Time    time.Time
 }
 
-type Browscap interface {
-	Service(fn func(Version))
-	Find(agent string) *Browser
-	Count() int
-}
-
-type browscap struct {
+type Browscap struct {
 	Version
 
 	mode browscapMode
@@ -49,7 +43,7 @@ type browscap struct {
 }
 
 
-func (bm browscapMode) Service(fn func(Version)) *browscap {
+func (bm browscapMode) Service(fn func(Version)) *Browscap {
 	var last time.Time
 
 	b := bm.new()
@@ -87,45 +81,45 @@ func (bm browscapMode) Service(fn func(Version)) *browscap {
 	return b
 }
 
-func (b browscap) Find(agent string) *Browser {
-	b.m.RLock()
-	defer b.m.RUnlock()
+func (bs Browscap) Find(agent string) *Browser {
+	bs.m.RLock()
+	defer bs.m.RUnlock()
 
-	return b.tree.Find(agent)
+	return bs.tree.Find(agent)
 }
 
-func (b *browscap) readVersion(reader *csv.Reader) {
+func (bs *Browscap) readVersion(reader *csv.Reader) {
 	reader.FieldsPerRecord = 0
 	reader.Read() // consume header
 
 	for {
 		if v, err := reader.Read(); err == nil {
-			b.Release, _ = strconv.Atoi(v[0])
-			b.Time, _ = time.Parse(time.RFC1123Z, v[1])
+			bs.Release, _ = strconv.Atoi(v[0])
+			bs.Time, _ = time.Parse(time.RFC1123Z, v[1])
 		} else if _, ok := err.(*csv.ParseError); ok {
 			break
 		}
 	}
 }
 
-func (b *browscap) readBrowsers(reader *csv.Reader) {
+func (bs *Browscap) readBrowsers(reader *csv.Reader) {
 	reader.FieldsPerRecord = 0
 
 	for {
 		if record, err := reader.Read(); err == nil {
-			b.count += b.add(record)
+			bs.count += bs.add(record)
 		} else if err == io.EOF {
 			break
 		}
 	}
 }
 
-func (b *browscap) Count() int {
-	return b.count
+func (bs *Browscap) Count() int {
+	return bs.count
 }
 
-func (bm browscapMode) new() *browscap {
-	b := &browscap{mode: bm}
+func (bm browscapMode) new() *Browscap {
+	b := &Browscap{mode: bm}
 
 	b.defaults = make(map[string]Browser)
 	b.platforms = make(map[uint32]string)
@@ -134,7 +128,7 @@ func (bm browscapMode) new() *browscap {
 	return b
 }
 
-func (bm browscapMode) Csv(file string) *browscap {
+func (bm browscapMode) Csv(file string) *Browscap {
 	if f, err := os.OpenFile(file, os.O_RDONLY, 0); err == nil {
 		return bm.CsvReader(csv.NewReader(f))
 	}
@@ -142,35 +136,36 @@ func (bm browscapMode) Csv(file string) *browscap {
 	return nil
 }
 
-func (bm browscapMode) CsvReader(reader *csv.Reader) *browscap {
+func (bm browscapMode) CsvReader(reader *csv.Reader) *Browscap {
 	b := bm.new()
 	b.fromCsv(reader)
 
 	return b
 }
 
-func (b *browscap) fromCsv(reader *csv.Reader) {
-	b.m.Lock()
-	defer b.m.Unlock()
+func (bs *Browscap) fromCsv(reader *csv.Reader) {
+	bs.m.Lock()
+	defer bs.m.Unlock()
 
-	b.readVersion(reader)
-	b.readBrowsers(reader)
+	bs.readVersion(reader)
+	bs.readBrowsers(reader)
 }
 
-func (b *browscap) add(opts []string) int {
+func (bs *Browscap) add(opts []string) int {
 	if len(opts) > 50 {
 		if fMasterParent.Is(opts) {
-			br := Browser{browscap: b}
+			br := Browser{bs: bs}
 			br.mapArray(opts)
-			b.defaults[fPropertyName.GetString(opts)] = br
+
+			bs.defaults[fPropertyName.GetString(opts)] = br
 
 			return 0
-		} else if b.mode == Lite && !fLiteMode.Is(opts) {
+		} else if bs.mode == Lite && !fLiteMode.Is(opts) {
 			return 0
-		} else if br, ok := b.defaults[fParent.GetString(opts)]; ok {
-			b.tree.Add(opts, &br)
+		} else if br, ok := bs.defaults[fParent.GetString(opts)]; ok {
+			bs.tree.Add(opts, &br)
 		} else {
-			b.tree.Add(opts, &Browser{browscap: b})
+			bs.tree.Add(opts, &Browser{bs: bs})
 		}
 
 		return 1
