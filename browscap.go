@@ -26,6 +26,7 @@ const defaultStream = "BrowsCapCSV"
 type Version struct {
 	Release int
 	Time    time.Time
+	Count   int
 }
 
 type Browscap struct {
@@ -33,15 +34,13 @@ type Browscap struct {
 
 	mode browscapMode
 
-	count            int
-	browsers,platforms map[uint32]string
+	browsers, platforms map[uint32]string
 
 	defaults map[string]Browser
 	tree     radixTree
 
 	m sync.RWMutex
 }
-
 
 func (bm browscapMode) Service(fn func(Version)) *Browscap {
 	var last time.Time
@@ -107,7 +106,7 @@ func (bs *Browscap) readBrowsers(reader *csv.Reader) {
 
 	for {
 		if record, err := reader.Read(); err == nil {
-			bs.count += bs.add(record)
+			bs.Version.Count += bs.add(record)
 		} else if err == io.EOF {
 			break
 		}
@@ -115,7 +114,7 @@ func (bs *Browscap) readBrowsers(reader *csv.Reader) {
 }
 
 func (bs *Browscap) Count() int {
-	return bs.count
+	return bs.Version.Count
 }
 
 func (bm browscapMode) new() *Browscap {
