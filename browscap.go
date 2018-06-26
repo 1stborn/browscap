@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"io/ioutil"
 	"sync"
+	"fmt"
 )
 
 type browscapMode int
@@ -29,6 +30,11 @@ type Version struct {
 	Count   int
 }
 
+type readProxy struct {
+	path   string
+	stream func() (io.Reader, error)
+}
+
 type Browscap struct {
 	Version
 
@@ -42,7 +48,20 @@ type Browscap struct {
 	m sync.RWMutex
 }
 
+func (bm browscapMode) ServiceCached(dir string, fn func(Version)) *Browscap {
+	return bm.startService(func(release time.Time) (io.Reader, error) {
+		return new(readProxy).Proxy(
+			dir+"/bs_"+release.Format("20060102150405")+".csv", func() (io.Reader, error) {
+				return bm.readUpstream(release)
+			})
+	}, fn)
+}
+
 func (bm browscapMode) Service(fn func(Version)) *Browscap {
+	return bm.startService(bm.readUpstream, fn)
+}
+
+func (bm browscapMode) startService(reader func(time.Time) (io.Reader, error), fn func(Version)) *Browscap {
 	var last time.Time
 
 	b := bm.new()
@@ -56,8 +75,8 @@ func (bm browscapMode) Service(fn func(Version)) *Browscap {
 				release, _ := time.Parse(time.RFC1123Z, string(bytes))
 
 				if b.Time.Before(release) {
-					if resp, err := http.Get(browscapStream + defaultStream); err == nil {
-						b.fromCsv(csv.NewReader(resp.Body))
+					if r, err := reader(release); err == nil {
+						b.fromCsv(csv.NewReader(r))
 						if fn != nil {
 							fn(b.Version)
 						}
@@ -78,6 +97,14 @@ func (bm browscapMode) Service(fn func(Version)) *Browscap {
 	}()
 
 	return b
+}
+
+func (bm browscapMode) readUpstream(time.Time) (io.Reader, error) {
+	if resp, err := http.Get(browscapStream + defaultStream); err == nil {
+		return resp.Body, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (bs Browscap) Find(agent string) *Browser {
@@ -171,4 +198,40 @@ func (bs *Browscap) add(opts []string) int {
 	}
 
 	return 0
+}
+
+func (proxy *readProxy) Proxy(file string, fn func() (io.Reader, error)) (io.Reader, error) {
+	if f, err := os.OpenFile(file, os.O_RDONLY, 0); err == nil {
+		return f, nil
+	} else if r, err := fn(); err == nil {
+		if f, err := os.OpenFile(file, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0); err == nil {
+			pr, pw := io.Pipe()
+
+			go func() {
+				var buffer = make([]byte, 4096)
+
+				defer pr.Close()
+				defer pw.Close()
+
+				for {
+					if n, err := r.Read(buffer); err != io.EOF {
+						f.Write(buffer[:n])
+						pw.Write(buffer[:n])
+					} else {
+						return
+					}
+				}
+			}()
+
+			return pr, nil
+		} else {
+			return r, nil
+		}
+	} else {
+		return nil, err
+	}
+}
+
+func (v Version) String() string {
+	return fmt.Sprintf("%d@%s", v.Release, v.Time.Format("2006-01-02 15:04:05"))
 }
