@@ -150,6 +150,29 @@ func (b *Browser) mapArray(opts []string) {
 	b.browser = hash
 }
 
+func (b Browser) Platform() string {
+	if p, ok := b.bs.platforms[b.platform]; ok {
+		return p
+	}
+
+	return "unknown"
+}
+
+func (b Browser) DeviceType() string {
+	return b.deviceType.String()
+}
+
+func (b Browser) PointingMethod() string {
+	return b.pointingMethod.String()
+}
+
+func (b Browser) Agent() string {
+	if a, ok := b.bs.browsers[b.browser]; ok {
+		return a
+	}
+	return "unknown"
+}
+
 func (b Browser) String() string {
-	return fmt.Sprintf("{%s@%s %s with %s}", b.bs.browsers[b.browser], b.bs.platforms[b.platform], b.deviceType, b.pointingMethod)
+	return fmt.Sprintf("{%s@%s %s with %s}", b.Agent(), b.Platform(), b.DeviceType(), b.PointingMethod())
 }
