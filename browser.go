@@ -8,6 +8,13 @@ import (
 type deviceType uint16
 type pointingMethod uint8
 
+type BrowserInfo struct {
+	Browser  string `json:"browser"`
+	Platform string `json:"platform"`
+	Device   string `json:"device"`
+	Pointer  string `json:"pointer"`
+}
+
 const (
 	_                  deviceType = 1 << iota
 	dtMobilePhone
@@ -171,6 +178,15 @@ func (b Browser) Agent() string {
 		return a
 	}
 	return "unknown"
+}
+
+func (b Browser) Info() BrowserInfo {
+	return BrowserInfo{
+		Browser:  b.Agent(),
+		Platform: b.Platform(),
+		Device:   b.DeviceType(),
+		Pointer:  b.PointingMethod(),
+	}
 }
 
 func (b Browser) String() string {
