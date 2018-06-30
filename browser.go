@@ -9,10 +9,17 @@ type deviceType uint16
 type pointingMethod uint8
 
 type BrowserInfo struct {
-	Browser  string `json:"browser"`
-	Platform string `json:"platform"`
-	Device   string `json:"device"`
-	Pointer  string `json:"pointer"`
+	*Platform `json:"platform"`
+
+	Browser string `json:"browser"`
+	Version string `json:"version"`
+}
+
+type Platform struct {
+	Device  string `json:"device"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Pointer string `json:"pointer"`
 }
 
 const (
@@ -44,6 +51,8 @@ type Browser struct {
 
 	browser  uint32
 	platform uint32
+
+	version, platformVersion string
 
 	deviceType
 	pointingMethod
@@ -140,6 +149,8 @@ func (b *Browser) setDeviceType(d string) {
 func (b *Browser) mapArray(opts []string) {
 	b.browserBits = fBrowserBits.GetInt(opts)
 	b.platformBits = fPlatformBits.GetInt(opts)
+	b.version = fVersion.GetString(opts)
+	b.platformVersion = fVersion.GetString(opts)
 
 	b.setDeviceType(fDeviceType.GetString(opts))
 	b.setPointingMethod(fDevicePointingMethod.GetString(opts))
@@ -157,20 +168,17 @@ func (b *Browser) mapArray(opts []string) {
 	b.browser = hash
 }
 
-func (b Browser) Platform() string {
+func (b Browser) Platform() *Platform {
 	if p, ok := b.bs.platforms[b.platform]; ok {
-		return p
+		return &Platform{
+			Name:    p,
+			Version: b.platformVersion,
+			Device:  b.deviceType.String(),
+			Pointer: b.pointingMethod.String(),
+		}
 	}
 
-	return "unknown"
-}
-
-func (b Browser) DeviceType() string {
-	return b.deviceType.String()
-}
-
-func (b Browser) PointingMethod() string {
-	return b.pointingMethod.String()
+	return nil
 }
 
 func (b Browser) Agent() string {
@@ -183,12 +191,16 @@ func (b Browser) Agent() string {
 func (b Browser) Info() BrowserInfo {
 	return BrowserInfo{
 		Browser:  b.Agent(),
+		Version:  b.version,
 		Platform: b.Platform(),
-		Device:   b.DeviceType(),
-		Pointer:  b.PointingMethod(),
 	}
 }
 
 func (b Browser) String() string {
-	return fmt.Sprintf("{%s@%s %s with %s}", b.Agent(), b.Platform(), b.DeviceType(), b.PointingMethod())
+	p := b.Platform()
+
+	return fmt.Sprintf("{%s@%s %s with %s}", b.Agent(), p.Name, p.Device, p.Pointer)
+}
+func (b *Browser) Version() string {
+	return b.version
 }
