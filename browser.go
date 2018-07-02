@@ -150,7 +150,7 @@ func (b *Browser) mapArray(opts []string) {
 	b.browserBits = fBrowserBits.GetInt(opts)
 	b.platformBits = fPlatformBits.GetInt(opts)
 	b.version = fVersion.GetString(opts)
-	b.platformVersion = fVersion.GetString(opts)
+	b.platformVersion = fPlatform_Version.GetString(opts)
 
 	b.setDeviceType(fDeviceType.GetString(opts))
 	b.setPointingMethod(fDevicePointingMethod.GetString(opts))

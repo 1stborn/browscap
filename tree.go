@@ -51,7 +51,9 @@ func (r *radixTree) Find(search string) *Browser {
 }
 
 func (r *radixTree) find(search string) (found []*Browser) {
-	if r.leafs == nil {
+	if len(search) == 0 {
+		return
+	} else if r.leafs == nil {
 		found = append(found, r.value)
 	}
 

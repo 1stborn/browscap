@@ -49,9 +49,9 @@ type Browscap struct {
 }
 
 func (bm browscapMode) ServiceCached(dir string, fn func(Version)) *Browscap {
-	return bm.startService(func(release time.Time) (io.Reader, error) {
+	return bm.startService(func(release time.Time) (io.ReadCloser, error) {
 		return new(readProxy).Proxy(
-			dir+"/bs_"+release.Format("20060102150405")+".csv", func() (io.Reader, error) {
+			dir+"/bs_"+release.Format("20060102150405")+".csv", func() (io.ReadCloser, error) {
 				return bm.readUpstream(release)
 			})
 	}, fn)
@@ -61,7 +61,7 @@ func (bm browscapMode) Service(fn func(Version)) *Browscap {
 	return bm.startService(bm.readUpstream, fn)
 }
 
-func (bm browscapMode) startService(reader func(time.Time) (io.Reader, error), fn func(Version)) *Browscap {
+func (bm browscapMode) startService(reader func(time.Time) (io.ReadCloser, error), fn func(Version)) *Browscap {
 	var last time.Time
 
 	b := bm.new()
@@ -80,6 +80,8 @@ func (bm browscapMode) startService(reader func(time.Time) (io.Reader, error), f
 						if fn != nil {
 							fn(b.Version)
 						}
+
+						r.Close()
 					}
 				}
 			}
@@ -99,7 +101,7 @@ func (bm browscapMode) startService(reader func(time.Time) (io.Reader, error), f
 	return b
 }
 
-func (bm browscapMode) readUpstream(time.Time) (io.Reader, error) {
+func (bm browscapMode) readUpstream(time.Time) (io.ReadCloser, error) {
 	if resp, err := http.Get(browscapStream + defaultStream); err == nil {
 		return resp.Body, nil
 	} else {
@@ -200,7 +202,7 @@ func (bs *Browscap) add(opts []string) int {
 	return 0
 }
 
-func (proxy *readProxy) Proxy(file string, fn func() (io.Reader, error)) (io.Reader, error) {
+func (proxy *readProxy) Proxy(file string, fn func() (io.ReadCloser, error)) (io.ReadCloser, error) {
 	if f, err := os.OpenFile(file, os.O_RDONLY, 0); err == nil {
 		return f, nil
 	} else if r, err := fn(); err == nil {
@@ -210,14 +212,13 @@ func (proxy *readProxy) Proxy(file string, fn func() (io.Reader, error)) (io.Rea
 			go func() {
 				var buffer = make([]byte, 4096)
 
-				defer pr.Close()
-				defer pw.Close()
-
 				for {
 					if n, err := r.Read(buffer); err != io.EOF {
 						f.Write(buffer[:n])
 						pw.Write(buffer[:n])
 					} else {
+						pw.Close()
+
 						return
 					}
 				}
