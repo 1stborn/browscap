@@ -12,15 +12,15 @@ import (
 	"fmt"
 )
 
-type browscapMode int
+type bsMode int
 
 const (
-	Lite browscapMode = iota
+	Lite bsMode = iota
 	Full
 )
 
-const browscapVersion = "http://Browscap.org/version"
-const browscapStream = "https://Browscap.org/stream?q="
+const bsVersion = "http://Browscap.org/version"
+const bsStream = "https://Browscap.org/stream?q="
 
 const defaultStream = "BrowsCapCSV"
 
@@ -38,17 +38,17 @@ type readProxy struct {
 type Browscap struct {
 	Version
 
-	mode browscapMode
+	mode bsMode
 
 	browsers, platforms map[uint32]string
 
-	defaults map[string]Browser
+	defaults map[uint32]Browser
 	tree     *browserTree
 
 	m sync.RWMutex
 }
 
-func (bm browscapMode) ServiceCached(dir string, fn func(Version)) *Browscap {
+func (bm bsMode) ServiceCached(dir string, fn func(Version)) *Browscap {
 	return bm.startService(func(release time.Time) (io.ReadCloser, error) {
 		return new(readProxy).Proxy(
 			dir+"/bs_"+release.Format("20060102150405")+".csv", func() (io.ReadCloser, error) {
@@ -57,18 +57,18 @@ func (bm browscapMode) ServiceCached(dir string, fn func(Version)) *Browscap {
 	}, fn)
 }
 
-func (bm browscapMode) Service(fn func(Version)) *Browscap {
+func (bm bsMode) Service(fn func(Version)) *Browscap {
 	return bm.startService(bm.readUpstream, fn)
 }
 
-func (bm browscapMode) startService(reader func(time.Time) (io.ReadCloser, error), fn func(Version)) *Browscap {
+func (bm bsMode) startService(reader func(time.Time) (io.ReadCloser, error), fn func(Version)) *Browscap {
 	var last time.Time
 
 	b := bm.new()
 
 	update := func(now time.Time) {
 		if now.Sub(last) > time.Hour {
-			if resp, err := http.Get(browscapVersion); err == nil && resp.StatusCode == 200 {
+			if resp, err := http.Get(bsVersion); err == nil && resp.StatusCode == 200 {
 				last = now
 
 				bytes, _ := ioutil.ReadAll(resp.Body)
@@ -101,8 +101,8 @@ func (bm browscapMode) startService(reader func(time.Time) (io.ReadCloser, error
 	return b
 }
 
-func (bm browscapMode) readUpstream(time.Time) (io.ReadCloser, error) {
-	if resp, err := http.Get(browscapStream + defaultStream); err == nil {
+func (bm bsMode) readUpstream(time.Time) (io.ReadCloser, error) {
+	if resp, err := http.Get(bsStream + defaultStream); err == nil {
 		return resp.Body, nil
 	} else {
 		return nil, err
@@ -132,10 +132,11 @@ func (bs *Browscap) readVersion(reader *csv.Reader) {
 
 func (bs *Browscap) readBrowsers(reader *csv.Reader) {
 	reader.FieldsPerRecord = 0
-
+	var weight int
 	for {
 		if record, err := reader.Read(); err == nil {
-			bs.Version.Count += bs.add(record)
+			weight++
+			bs.Version.Count += bs.add(record, weight)
 		} else if err == io.EOF {
 			break
 		}
@@ -146,17 +147,17 @@ func (bs *Browscap) Count() int {
 	return bs.Version.Count
 }
 
-func (bm browscapMode) new() *Browscap {
+func (bm bsMode) new() *Browscap {
 	b := &Browscap{mode: bm, tree: newTree()}
 
-	b.defaults = make(map[string]Browser)
+	b.defaults = make(map[uint32]Browser)
 	b.platforms = make(map[uint32]string)
 	b.browsers = make(map[uint32]string)
 
 	return b
 }
 
-func (bm browscapMode) Csv(file string) *Browscap {
+func (bm bsMode) Csv(file string) *Browscap {
 	if f, err := os.OpenFile(file, os.O_RDONLY, 0); err == nil {
 		return bm.CsvReader(csv.NewReader(f))
 	}
@@ -164,7 +165,7 @@ func (bm browscapMode) Csv(file string) *Browscap {
 	return nil
 }
 
-func (bm browscapMode) CsvReader(reader *csv.Reader) *Browscap {
+func (bm bsMode) CsvReader(reader *csv.Reader) *Browscap {
 	b := bm.new()
 	b.fromCsv(reader)
 
@@ -179,22 +180,42 @@ func (bs *Browscap) fromCsv(reader *csv.Reader) {
 	bs.readBrowsers(reader)
 }
 
-func (bs *Browscap) add(opts []string) int {
+func (bs *Browscap) add(opts []string, weight int) int {
 	if len(opts) > 50 {
 		if fMasterParent.Is(opts) {
 			br := Browser{bs: bs}
 			br.mapArray(opts)
 
-			bs.defaults[fPropertyName.GetString(opts)] = br
+			_, hash := fPropertyName.Hash(opts)
+
+			bs.defaults[hash] = br
 
 			return 0
 		} else if bs.mode == Lite && !fLiteMode.Is(opts) {
 			return 0
-		} else if br, ok := bs.defaults[fParent.GetString(opts)]; ok {
-			bs.tree.Add(opts, &br)
 		} else {
-			bs.tree.Add(opts, &Browser{bs: bs})
+			_, hash := fParent.Hash(opts)
+
+			if br, ok := bs.defaults[hash]; ok {
+				bs.tree.Add(opts, &br)
+			} else {
+				bs.tree.Add(opts, &Browser{bs: bs})
+			}
 		}
+
+		if fMasterParent.Is(opts) {
+			return 0
+		}
+
+		if fIsFake.Is(opts) {
+			return 0
+		}
+
+		if bs.mode == Lite && !fLiteMode.Is(opts) {
+			return 0
+		}
+
+		bs.tree.Add(opts, &Browser{bs: bs})
 
 		return 1
 	}

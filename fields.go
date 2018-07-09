@@ -49,8 +49,8 @@ const (
 	fisSyndicationReader
 	fCrawler
 	fIsFake
-	fisAnonymized
-	fisModified
+	fIsAnonymized
+	fIsModified
 	fCssVersion
 	fAolVersion
 	fDevice_Name

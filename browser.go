@@ -154,7 +154,7 @@ func (b *Browser) mapArray(opts []string) {
 
 	b.setDeviceType(fDeviceType.GetString(opts))
 	b.setPointingMethod(fDevicePointingMethod.GetString(opts))
-
+	
 	value, hash := fPlatform.Hash(opts)
 	if _, ok := b.bs.platforms[hash]; !ok {
 		b.bs.platforms[hash] = strings.ToLower(value)
@@ -199,7 +199,7 @@ func (b Browser) Info() BrowserInfo {
 func (b Browser) String() string {
 	p := b.Platform()
 
-	return fmt.Sprintf("{%s@%s %s with %s}", b.Agent(), p.Name, p.Device, p.Pointer)
+	return fmt.Sprintf("{%s(%s)@%s(%s) %s with %s}",  b.Agent(), b.version, p.Name, p.Version, p.Device, p.Pointer)
 }
 func (b *Browser) Version() string {
 	return b.version

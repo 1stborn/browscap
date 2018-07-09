@@ -20,7 +20,7 @@ func (bt *browserTree) Add(opts []string, br *Browser) {
 }
 
 func (bt *browserTree) Find(search string) *Browser {
-	if b, ok := bt.rtree.Find(search).(*Browser); ok {
+	if b, ok := bt.rtree.FindFirst(search).(*Browser); ok {
 		return b
 	}
 
