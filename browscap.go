@@ -43,7 +43,7 @@ type Browscap struct {
 	browsers, platforms map[uint32]string
 
 	defaults map[string]Browser
-	tree     radixTree
+	tree     *browserTree
 
 	m sync.RWMutex
 }
@@ -147,7 +147,7 @@ func (bs *Browscap) Count() int {
 }
 
 func (bm browscapMode) new() *Browscap {
-	b := &Browscap{mode: bm}
+	b := &Browscap{mode: bm, tree: newTree()}
 
 	b.defaults = make(map[string]Browser)
 	b.platforms = make(map[uint32]string)
